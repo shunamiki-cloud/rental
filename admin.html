@@ -509,7 +509,6 @@ async function load() {
   document.getElementById('recordCount').textContent = records.length + '件';
   updateDateFilter();
   renderStats();
-  renderLockerBoard();
 }
 
 
@@ -519,7 +518,10 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const map = {stats:'Stats', locker:'Locker', settings:'Settings'};
   document.getElementById('panel'+map[tab]).classList.add('active');
-  if (tab === 'locker')   { load().then(() => { renderLockerBoard(); }); }
+  if (tab === 'locker') {
+    document.getElementById('lockerBoard').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-sub);font-size:14px;">読み込み中...</div>';
+    load().then(() => renderLockerBoard());
+  }
   if (tab === 'settings') renderSettings();
 }
 
