@@ -524,7 +524,7 @@ async function refreshOccupied() {
   try {
     const [recs, retIds] = await Promise.all([gasGet('records'), gasGet('returned')]);
     const retSet = new Set(retIds);
-    _occupiedCache = new Set(recs.filter((r,i)=>!retSet.has(i)&&r.locker).map(r=>r.locker.trim()));
+    _occupiedCache = new Set(recs.filter((r,i)=>!retSet.has(i)&&r.locker).map(r=>String(r.locker).trim()));
   } catch(e) { _occupiedCache = new Set(); }
 }
 
