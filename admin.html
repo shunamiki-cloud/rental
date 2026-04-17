@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>管理画面 — レンタル受付</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --green: #1D9E75; --green-light: #E1F5EE; --green-mid: #5DCAA5; --green-dark: #0F6E56;
+    --text: #1a1a1a; --text-sub: #666; --text-hint: #aaa;
+    --border: rgba(0,0,0,0.12); --bg: #f7f8f6; --card: #ffffff;
+    --radius: 12px; --radius-sm: 8px;
+  }
+  body { font-family: 'Noto Sans JP', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header {
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .logo { font-size: 15px; font-weight: 700; color: var(--green); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .refresh-btn {
+    padding: 6px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: transparent; font-size: 13px; font-family: inherit; cursor: pointer; color: var(--text-sub);
+  }
+  .refresh-btn:hover { background: var(--bg); }
+  .record-count { font-size: 12px; color: var(--text-hint); }
+
+  main { max-width: 1000px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 13px 18px; font-size: 14px; font-weight: 500; cursor: pointer;
+    color: var(--text-sub); border-bottom: 2px solid transparent;
+    background: none; border-top: none; border-left: none; border-right: none;
+    font-family: inherit; transition: color 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; animation: fadeUp 0.2s ease; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  /* Date filter */
+  .filter-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .filter-label { font-size: 13px; color: var(--text-sub); white-space: nowrap; }
+  .date-select {
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 14px; font-family: inherit; color: var(--text); background: var(--card); cursor: pointer;
+  }
+  .date-select:focus { outline: none; border-color: var(--green); }
+
+  /* Stat grid */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 28px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .stat-label { font-size: 11px; color: var(--text-sub); margin-bottom: 8px; letter-spacing: 0.03em; }
+  .stat-val { font-size: 32px; font-weight: 700; line-height: 1; color: var(--text); }
+  .stat-unit { font-size: 14px; font-weight: 400; color: var(--text-sub); margin-left: 3px; }
+
+  /* Section */
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 16px; }
+  .section-title { font-size: 12px; font-weight: 500; color: var(--text-sub); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 16px; }
+
+  /* Bar chart */
+  .bar-list { display: flex; flex-direction: column; gap: 10px; }
+  .bar-item { display: flex; align-items: center; gap: 12px; }
+  .bar-label { font-size: 13px; color: var(--text); width: 160px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; height: 10px; background: var(--bg); border-radius: 99px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 99px; transition: width 0.5s ease; }
+  .fill-green  { background: var(--green); }
+  .fill-blue   { background: #378ADD; }
+  .fill-coral  { background: #D85A30; }
+  .fill-purple { background: #7F77DD; }
+  .fill-amber  { background: #BA7517; }
+  .bar-count { font-size: 13px; font-weight: 700; color: var(--text); min-width: 28px; text-align: right; }
+  .no-data { font-size: 13px; color: var(--text-hint); padding: 4px 0; }
+
+  /* Two column layout for charts */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .charts-grid { grid-template-columns: 1fr; } }
+
+  /* Table */
+
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 48px 0; color: var(--text-hint); font-size: 14px; }
+
+
+
+
+  /* ── ロッカーボード ── */
+  .locker-section { margin-bottom: 28px; }
+  .locker-section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .locker-section-title { font-size: 15px; font-weight: 700; }
+  .locker-legend { display: flex; gap: 14px; margin-left: auto; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-sub); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+  .legend-dot.free     { background: var(--green); }
+  .legend-dot.occupied { background: #aaa; }
+
+  /* タブレット対応ロッカーグリッド */
+  .locker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 10px;
+  }
+  /* 縦持ち（768px前後）*/
+  @media (min-width: 600px) {
+    .locker-grid { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 10px; }
+  }
+  /* 横持ち（1024px前後）*/
+  @media (min-width: 900px) {
+    .locker-grid { grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 12px; }
+  }
+
+  .locker-btn {
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.15s;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    min-height: 64px;
+  }
+  .locker-btn:active { transform: scale(0.93); }
+
+  .locker-btn.free {
+    background: var(--green-light); color: var(--green-dark);
+    border: 1.5px solid rgba(29,158,117,0.25);
+  }
+  .locker-btn.free:hover { background: #c8eddf; }
+
+  .locker-btn.occupied {
+    background: #e8e8e8; color: #888;
+    border: 1.5px solid #d8d8d8; cursor: pointer;
+  }
+  .locker-btn.occupied:active { background: #ddd; }
+
+  .locker-btn .locker-num { font-size: 16px; font-weight: 700; line-height: 1; }
+  .locker-btn .locker-name { font-size: 10px; font-weight: 400; line-height: 1; max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  @media (min-width: 900px) {
+    .locker-btn .locker-num { font-size: 17px; }
+    .locker-btn .locker-name { font-size: 11px; }
+  }
+
+  /* 返却ダイアログ */
+  .dialog-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45); z-index: 200;
+    align-items: center; justify-content: center; padding: 16px;
+  }
+  .dialog-overlay.open { display: flex; }
+  .dialog {
+    background: var(--card); border-radius: var(--radius);
+    padding: 28px; width: 100%; max-width: 420px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    animation: fadeUp 0.2s ease;
+  }
+  .dialog-locker { font-size: 11px; color: var(--text-sub); margin-bottom: 4px; }
+  .dialog-name { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+  .dialog-info { background: var(--bg); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 20px; }
+  .dialog-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; border-bottom: 1px solid var(--border); gap: 12px; }
+  .dialog-row:last-child { border-bottom: none; }
+  .dialog-row-label { color: var(--text-sub); flex-shrink: 0; }
+  .dialog-row-val { font-weight: 500; text-align: right; }
+  .dialog-actions { display: flex; gap: 10px; }
+  .dialog-btn { flex: 1; padding: 15px 12px; border-radius: var(--radius-sm); font-size: 15px; font-family: inherit; font-weight: 500; cursor: pointer; border: 1.5px solid var(--border); background: transparent; color: var(--text); -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  .dialog-btn:hover { background: var(--bg); }
+  .dialog-btn.confirm { background: var(--green); color: #fff; border-color: var(--green); }
+  .dialog-btn.confirm:hover { background: var(--green-dark); }
+  .badge-item { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 500; background: var(--green-light); color: var(--green-dark); margin: 2px 2px 0 0; }
+
+  /* ── 設定タブ ── */
+  .settings-section { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 24px; margin-bottom: 16px; }
+  .settings-section-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .settings-section-desc  { font-size: 12px; color: var(--text-sub); margin-bottom: 16px; }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 500;
+    background: var(--green-light); color: var(--green-dark);
+    border: 1px solid rgba(29,158,117,0.25);
+  }
+  .tag-del {
+    width: 16px; height: 16px; border-radius: 50%; background: rgba(15,110,86,0.15);
+    border: none; cursor: pointer; font-size: 12px; color: var(--green-dark);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    line-height: 1; padding: 0; font-family: inherit;
+  }
+  .tag-del:hover { background: rgba(15,110,86,0.3); }
+  .tag.inactive { background: #f0f0f0; color: #999; border-color: #e0e0e0; }
+  .tag.inactive .tag-del { color: #999; background: rgba(0,0,0,0.07); }
+  .add-row { display: flex; gap: 8px; margin-top: 4px; }
+  .add-input {
+    flex: 1; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 14px; font-family: inherit; color: var(--text); background: var(--bg);
+  }
+  .add-input:focus { outline: none; border-color: var(--green); }
+  .add-btn {
+    padding: 9px 16px; border-radius: var(--radius-sm); border: 1.5px solid var(--green);
+    background: transparent; color: var(--green); font-size: 13px; font-family: inherit;
+    font-weight: 500; cursor: pointer; white-space: nowrap;
+  }
+  .add-btn:hover { background: var(--green-light); }
+  .settings-save-bar { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid var(--border); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -20px; }
+  .save-btn { padding: 12px 28px; border-radius: var(--radius-sm); background: var(--green); color: #fff; border: none; font-size: 14px; font-family: inherit; font-weight: 700; cursor: pointer; }
+  .save-btn:hover { background: var(--green-dark); }
+  .save-toast { font-size: 13px; color: var(--green-dark); font-weight: 500; opacity: 0; transition: opacity 0.3s; }
+  .save-toast.show { opacity: 1; }
+  .model-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .model-row input {
+    padding: 8px 10px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 13px; font-family: inherit; color: var(--text); background: var(--bg);
+  }
+  .model-row input:focus { outline: none; border-color: var(--green); }
+  .model-name-input { width: 120px; }
+  .model-gender-select {
+    padding: 8px 10px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 13px; font-family: inherit; color: var(--text); background: var(--bg); cursor: pointer;
+  }
+  .model-del-btn {
+    padding: 7px 12px; border-radius: var(--radius-sm); border: 1px solid #f0997b;
+    background: transparent; color: #993c1d; font-size: 12px; font-family: inherit; cursor: pointer;
+  }
+  .model-del-btn:hover { background: #FAECE7; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 14px; font-weight: 500; }
+  .toggle-sub   { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+  .toggle-switch { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0; background: #ddd; border-radius: 99px; cursor: pointer; transition: background 0.2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute; width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; top: 3px; left: 3px; transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle-switch input:checked + .toggle-slider { background: var(--green); }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">管理画面 — レンタル受付</div>
+  <div class="header-right">
+    <span class="record-count" id="recordCount">0件</span>
+    <button class="refresh-btn" onclick="load()">更新</button>
+  </div>
+</header>
+
+<main>
+  <div id="loadingMsg" style="display:none;text-align:center;padding:20px;font-size:14px;color:var(--text-sub);">データを読み込み中...</div>
+  <div id="errorMsg" style="display:none;background:#FCEBEB;border:1px solid #F09595;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#A32D2D;"></div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('stats')">集計</button>
+    <button class="tab" onclick="switchTab('locker')">ロッカーボード</button>
+    <button class="tab" onclick="switchTab('settings')">設定</button>
+  </div>
+
+  <!-- 集計タブ -->
+  <div class="tab-panel active" id="panelStats">
+    <div class="filter-row">
+      <span class="filter-label">日付で絞り込み</span>
+      <select class="date-select" id="dateFilter" onchange="renderStats()">
+        <option value="all">すべての日付</option>
+      </select>
+    </div>
+
+    <div class="stat-grid" id="statCards"></div>
+
+    <div class="charts-grid">
+      <div class="section">
+        <div class="section-title">シューズ　モデル別</div>
+        <div class="bar-list" id="chartShoeModel"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">シューズ　サイズ別</div>
+        <div class="bar-list" id="chartShoeSize"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">ウェア　トップスサイズ別</div>
+        <div class="bar-list" id="chartTops"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">ウェア　ボトムスサイズ別</div>
+        <div class="bar-list" id="chartBottoms"></div>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- ロッカーボードタブ -->
+  <div class="tab-panel" id="panelLocker">
+    <div id="lockerBoard"></div>
+  </div>
+
+  <!-- 返却確認ダイアログ -->
+  <div class="dialog-overlay" id="dialogOverlay">
+    <div class="dialog">
+      <div class="dialog-locker" id="dlgLockerLabel"></div>
+      <div class="dialog-name" id="dlgName"></div>
+      <div class="dialog-info" id="dlgInfo"></div>
+      <div class="dialog-actions">
+        <button class="dialog-btn" onclick="closeDialog()">キャンセル</button>
+        <button class="dialog-btn confirm" onclick="confirmReturn()">返却する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 設定タブ -->
+  <div class="tab-panel" id="panelSettings">
+
+    <!-- レンタル品目のON/OFF -->
+    <div class="settings-section">
+      <div class="settings-section-title">レンタル品目</div>
+      <div class="settings-section-desc">お客様アンケートに表示する品目を設定します。</div>
+      <div id="itemToggles"></div>
+    </div>
+
+    <!-- ウェアサイズ -->
+    <div class="settings-section">
+      <div class="settings-section-title">ウェア　サイズ展開</div>
+      <div class="settings-section-desc">トップス・ボトムス共通のサイズ一覧です。</div>
+      <div class="tag-list" id="wearSizeTags"></div>
+      <div class="add-row">
+        <input class="add-input" id="newWearSize" placeholder="例：XXXL">
+        <button class="add-btn" onclick="addWearSize()">追加</button>
+      </div>
+    </div>
+
+    <!-- ウェア種類 -->
+    <div class="settings-section">
+      <div class="settings-section-title">ウェア　種類</div>
+      <div class="settings-section-desc">ウェアのアイテム種類を設定します。追加した種類ごとにサイズ選択が表示されます。</div>
+      <div class="tag-list" id="wearTypeTags"></div>
+      <div class="add-row">
+        <input class="add-input" id="newWearType" placeholder="例：グローブ、ヘルメット">
+        <button class="add-btn" onclick="addWearType()">追加</button>
+      </div>
+    </div>
+
+    <!-- シューズモデル -->
+    <div class="settings-section">
+      <div class="settings-section-title">シューズ　モデル</div>
+      <div class="settings-section-desc">モデル名と性別を設定します。</div>
+      <div id="shoeModelList"></div>
+      <div class="add-row" style="margin-top:12px;">
+        <input class="add-input model-name-input" id="newModelName" placeholder="モデル名">
+        <select class="model-gender-select" id="newModelGender">
+          <option value="mens">メンズ</option>
+          <option value="womens">レディース</option>
+          <option value="unisex">ユニセックス</option>
+        </select>
+        <button class="add-btn" onclick="addShoeModel()">追加</button>
+      </div>
+    </div>
+
+    <!-- シューズサイズ -->
+    <div class="settings-section">
+      <div class="settings-section-title">シューズ　サイズ展開</div>
+      <div class="settings-section-desc">メンズ・レディース・ユニセックスそれぞれのサイズを設定します。</div>
+      <div style="margin-bottom:16px;">
+        <div class="field-title" style="font-size:12px;color:var(--text-sub);margin-bottom:8px;">メンズ</div>
+        <div class="tag-list" id="shoeSizeTagsMens"></div>
+        <div class="add-row">
+          <input class="add-input" id="newShoeSizeMens" placeholder="例：30.0">
+          <button class="add-btn" onclick="addShoeSize('mens')">追加</button>
+        </div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div class="field-title" style="font-size:12px;color:var(--text-sub);margin-bottom:8px;">レディース</div>
+        <div class="tag-list" id="shoeSizeTagsWomens"></div>
+        <div class="add-row">
+          <input class="add-input" id="newShoeSizeWomens" placeholder="例：26.0">
+          <button class="add-btn" onclick="addShoeSize('womens')">追加</button>
+        </div>
+      </div>
+      <div>
+        <div class="field-title" style="font-size:12px;color:var(--text-sub);margin-bottom:8px;">ユニセックス</div>
+        <div class="tag-list" id="shoeSizeTagsUnisex"></div>
+        <div class="add-row">
+          <input class="add-input" id="newShoeSizeUnisex" placeholder="例：29.0">
+          <button class="add-btn" onclick="addShoeSize('unisex')">追加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-save-bar">
+      <span class="save-toast" id="saveToast">保存しました</span>
+      <button class="save-btn" onclick="saveSettings()">設定を保存する</button>
+    </div>
+  </div>
+</main>
+
+<script>
+// =====================================================
+// ★ Google Apps Script の Web アプリ URL をここに貼る ★
+// =====================================================
+const GAS_URL = 'YOUR_GAS_WEB_APP_URL_HERE';
+// =====================================================
+
+async function gasGet(action) {
+  const res = await fetch(`${GAS_URL}?action=${action}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error);
+  return data.data;
+}
+
+async function gasPost(action, payload) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, data: payload }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error);
+  return data;
+}
+
+let records = [];
+let returnedIds = new Set();
+
+async function load() {
+  document.getElementById('loadingMsg').style.display = 'block';
+  try {
+    if (GAS_URL !== 'YOUR_GAS_WEB_APP_URL_HERE') {
+      const [recs, retArr] = await Promise.all([gasGet('records'), gasGet('returned')]);
+      records = recs || [];
+      returnedIds = new Set(retArr || []);
+    } else {
+      // localStorageフォールバック
+      const s = localStorage.getItem('rentalRecords');
+      records = s ? JSON.parse(s) : [];
+      const r = localStorage.getItem('rentalReturned');
+      returnedIds = r ? new Set(JSON.parse(r)) : new Set();
+    }
+  } catch(e) {
+    console.error('データ取得失敗:', e);
+    document.getElementById('errorMsg').textContent = 'データの取得に失敗しました: ' + e.message;
+    document.getElementById('errorMsg').style.display = 'block';
+  } finally {
+    document.getElementById('loadingMsg').style.display = 'none';
+  }
+  document.getElementById('recordCount').textContent = records.length + '件';
+  updateDateFilter();
+  renderStats();
+}
+
+
+function switchTab(tab) {
+  const tabs = ['stats','locker','settings'];
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i]===tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const map = {stats:'Stats', locker:'Locker', settings:'Settings'};
+  document.getElementById('panel'+map[tab]).classList.add('active');
+  if (tab === 'locker')   renderLockerBoard();
+  if (tab === 'settings') renderSettings();
+}
+
+/* ── Date filter ── */
+function updateDateFilter() {
+  const sel = document.getElementById('dateFilter');
+  const cur = sel.value;
+  const dates = [...new Set(records.map(r => r.date))].sort().reverse();
+  sel.innerHTML = '<option value="all">すべての日付</option>' +
+    dates.map(d => `<option value="${d}" ${d===cur?'selected':''}>${d}</option>`).join('');
+}
+
+function filteredRecords() {
+  const d = document.getElementById('dateFilter').value;
+  return d === 'all' ? records : records.filter(r => r.date === d);
+}
+
+/* ── Stats ── */
+function renderStats() {
+  const rs = filteredRecords();
+  const shoeRecs = rs.filter(r => r.shoes === 'あり');
+  const wearRecs = rs.filter(r => r.wear  === 'あり');
+
+  // Summary cards
+  document.getElementById('statCards').innerHTML = [
+    { label:'登録人数',      val: rs.length,         unit:'人', color:'var(--green)' },
+    { label:'シューズ貸出',   val: shoeRecs.length,   unit:'足', color:'#378ADD' },
+    { label:'ウェア貸出',    val: wearRecs.length,    unit:'着', color:'#D85A30' },
+    { label:'サングラス貸出', val: rs.filter(r=>r.sunglass==='あり').length, unit:'本', color:'#7F77DD' },
+    { label:'ザック貸出',     val: rs.filter(r=>r.zack==='あり').length,     unit:'個', color:'#BA7517' },
+  ].map(s => `<div class="stat-card">
+    <div class="stat-label">${s.label}</div>
+    <div class="stat-val" style="color:${s.color}">${s.val}<span class="stat-unit">${s.unit}</span></div>
+  </div>`).join('');
+
+  // Shoe model chart
+  renderBarChart('chartShoeModel', countBy(shoeRecs, 'shoeModel'), 'fill-blue');
+  // Shoe size chart
+  const shoeSizeData = countBy(shoeRecs, 'shoeSize');
+  const sortedShoeSizes = Object.fromEntries(
+    Object.entries(shoeSizeData).sort((a,b) => parseFloat(a[0]) - parseFloat(b[0]))
+  );
+  renderBarChart('chartShoeSize', sortedShoeSizes, 'fill-green');
+  // Wear tops
+  const ORDER = ['XS','S','M','L','XL','XXL'];
+  const topsRaw = countBy(wearRecs, 'topsSize');
+  const topsData = Object.fromEntries(ORDER.filter(s=>topsRaw[s]).map(s=>[s, topsRaw[s]]));
+  renderBarChart('chartTops', topsData, 'fill-blue');
+  // Wear bottoms
+  const botRaw = countBy(wearRecs, 'bottomsSize');
+  const botData = Object.fromEntries(ORDER.filter(s=>botRaw[s]).map(s=>[s, botRaw[s]]));
+  renderBarChart('chartBottoms', botData, 'fill-coral');
+}
+
+function countBy(arr, key) {
+  const m = {};
+  arr.forEach(r => { if(r[key]) m[r[key]] = (m[r[key]]||0)+1; });
+  return m;
+}
+
+function renderBarChart(elId, data, fillClass) {
+  const el = document.getElementById(elId);
+  const entries = Object.entries(data);
+  if (!entries.length) { el.innerHTML = '<div class="no-data">データなし</div>'; return; }
+  const max = Math.max(...entries.map(e=>e[1]));
+  el.innerHTML = entries.map(([k,v]) =>
+    `<div class="bar-item">
+      <div class="bar-label">${k}</div>
+      <div class="bar-track"><div class="bar-fill ${fillClass}" style="width:${Math.round(v/max*100)}%"></div></div>
+      <div class="bar-count">${v}</div>
+    </div>`).join('');
+}
+
+
+/* ── デフォルト設定 ── */
+const DEFAULT_SETTINGS = {
+  items: [
+    { key:'wear',     label:'ウェア',     enabled:true },
+    { key:'shoes',    label:'シューズ',   enabled:true },
+    { key:'sunglass', label:'サングラス', enabled:true },
+    { key:'zack',     label:'ザック',     enabled:true },
+  ],
+  wearSizes: ['XS','S','M','L','XL','XXL'],
+  wearTypes: ['トップス', 'ボトムス'],
+  shoeModels: [
+    { id:'mx_m', name:'モデルMX', gender:'mens',   label:'メンズ' },
+    { id:'mx_w', name:'モデルMX', gender:'womens', label:'レディース' },
+    { id:'rx_m', name:'モデルRX', gender:'mens',   label:'メンズ' },
+    { id:'rx_w', name:'モデルRX', gender:'womens', label:'レディース' },
+    { id:'cx_u', name:'モデルCX', gender:'unisex', label:'ユニセックス' },
+  ],
+  shoeSizes: {
+    mens:   ['25.0','25.5','26.0','26.5','27.0','27.5','28.0','28.5','29.0'],
+    womens: ['22.0','22.5','23.0','23.5','24.0','24.5','25.0','25.5'],
+    unisex: ['24.0','24.5','25.0','25.5','26.0','26.5','27.0','27.5','28.0'],
+  },
+};
+
+let cfg = null;
+
+function mergeCfg(stored) {
+  DEFAULT_SETTINGS.items.forEach(def => {
+    if (!stored.items.find(i => i.key === def.key)) stored.items.push({ ...def });
+  });
+  if (!stored.wearTypes) stored.wearTypes = ['トップス', 'ボトムス'];
+  return stored;
+}
+
+async function loadSettings() {
+  // まずlocalStorageから
+  try {
+    const s = localStorage.getItem('rentalSettings');
+    cfg = s ? mergeCfg(JSON.parse(s)) : JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  } catch(e) { cfg = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); }
+
+  // GASから最新を取得
+  if (GAS_URL !== 'YOUR_GAS_WEB_APP_URL_HERE') {
+    try {
+      const data = await gasGet('settings');
+      if (data) {
+        cfg = mergeCfg(data);
+        localStorage.setItem('rentalSettings', JSON.stringify(cfg));
+      }
+    } catch(e) { console.warn('設定取得失敗、キャッシュ使用'); }
+  }
+}
+
+async function saveSettings() {
+  localStorage.setItem('rentalSettings', JSON.stringify(cfg));
+  if (GAS_URL !== 'YOUR_GAS_WEB_APP_URL_HERE') {
+    try { await gasPost('saveSettings', cfg); } catch(e) { console.error('設定保存失敗:', e); }
+  }
+  const toast = document.getElementById('saveToast');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+const GENDER_LABEL = { mens:'メンズ', womens:'レディース', unisex:'ユニセックス' };
+
+function renderSettings() {
+  // 品目トグル
+  document.getElementById('itemToggles').innerHTML = cfg.items.map((item, i) => `
+    <div class="toggle-row">
+      <div><div class="toggle-label">${item.label}</div></div>
+      <label class="toggle-switch">
+        <input type="checkbox" ${item.enabled?'checked':''} onchange="cfg.items[${i}].enabled=this.checked">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>`).join('');
+
+  // ウェア種類
+  renderTagList('wearTypeTags', cfg.wearTypes || [], i => {
+    cfg.wearTypes.splice(i,1); renderSettings();
+  });
+
+  // ウェアサイズ
+  renderTagList('wearSizeTags', cfg.wearSizes, i => {
+    cfg.wearSizes.splice(i,1); renderSettings();
+  });
+
+  // シューズモデル
+  document.getElementById('shoeModelList').innerHTML = cfg.shoeModels.map((m, i) => `
+    <div class="model-row">
+      <input class="model-name-input" value="${m.name}" oninput="cfg.shoeModels[${i}].name=this.value;updateModelLabel(${i})">
+      <select class="model-gender-select" onchange="cfg.shoeModels[${i}].gender=this.value;cfg.shoeModels[${i}].label=GENDER_LABEL[this.value]">
+        <option value="mens"   ${m.gender==='mens'  ?'selected':''}>メンズ</option>
+        <option value="womens" ${m.gender==='womens'?'selected':''}>レディース</option>
+        <option value="unisex" ${m.gender==='unisex'?'selected':''}>ユニセックス</option>
+      </select>
+      <button class="model-del-btn" onclick="cfg.shoeModels.splice(${i},1);renderSettings()">削除</button>
+    </div>`).join('');
+
+  // シューズサイズ
+  ['mens','womens','unisex'].forEach(g => {
+    renderTagList('shoeSizeTags'+g.charAt(0).toUpperCase()+g.slice(1), cfg.shoeSizes[g], i => {
+      cfg.shoeSizes[g].splice(i,1); renderSettings();
+    });
+  });
+}
+
+function updateModelLabel(i) {
+  // label is set by gender; name is separate
+}
+
+function renderTagList(elId, arr, onDel) {
+  document.getElementById(elId).innerHTML = arr.map((v, i) => `
+    <span class="tag">
+      ${v}
+      <button class="tag-del" onclick="(${onDel.toString()})(${i})">×</button>
+    </span>`).join('');
+}
+
+function addWearType() {
+  const v = document.getElementById('newWearType').value.trim();
+  if (!v) return;
+  if (!cfg.wearTypes) cfg.wearTypes = ['トップス','ボトムス'];
+  cfg.wearTypes.push(v);
+  document.getElementById('newWearType').value = '';
+  renderSettings();
+}
+
+function addWearSize() {
+  const v = document.getElementById('newWearSize').value.trim();
+  if (!v) return;
+  cfg.wearSizes.push(v);
+  document.getElementById('newWearSize').value = '';
+  renderSettings();
+}
+
+function addShoeModel() {
+  const name   = document.getElementById('newModelName').value.trim();
+  const gender = document.getElementById('newModelGender').value;
+  if (!name) return;
+  cfg.shoeModels.push({ id: 'custom_'+Date.now(), name, gender, label: GENDER_LABEL[gender] });
+  document.getElementById('newModelName').value = '';
+  renderSettings();
+}
+
+function addShoeSize(gender) {
+  const capG = gender.charAt(0).toUpperCase()+gender.slice(1);
+  const v = document.getElementById('newShoeSize'+capG).value.trim();
+  if (!v) return;
+  cfg.shoeSizes[gender].push(v);
+  document.getElementById('newShoeSize'+capG).value = '';
+  renderSettings();
+}
+
+
+/* ── ロッカーボード ── */
+const LOCKER_SECTIONS = [
+  { key:'mens',   label:'男性ロッカー', count:58 },
+  { key:'womens', label:'女性ロッカー', count:46 },
+  { key:'temp',   label:'臨時ロッカー', count:36 },
+];
+
+let dialogTargetIdx = null;
+
+function getOccupiedMap() {
+  const map = {};
+  records.forEach((r, idx) => {
+    if (!returnedIds.has(idx) && r.locker) map[r.locker.trim()] = idx;
+  });
+  return map;
+}
+
+function renderLockerBoard() {
+  const occupied = getOccupiedMap();
+  const totalOccupied = Object.keys(occupied).length;
+  const totalAll = 58 + 46 + 36;
+  let html = `<div style="display:flex;gap:14px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
+    <div class="legend-item"><div class="legend-dot free"></div>空き</div>
+    <div class="legend-item"><div class="legend-dot occupied"></div>貸出中</div>
+    <div style="margin-left:auto;font-size:12px;color:var(--text-sub);">
+      貸出中：<strong>${totalOccupied}</strong>個 ／ 空き：<strong>${totalAll - totalOccupied}</strong>個
+    </div>
+  </div>`;
+
+  LOCKER_SECTIONS.forEach(sec => {
+    html += `<div class="locker-section">
+      <div class="locker-section-header">
+        <div class="locker-section-title">${sec.label}</div>
+        <div style="font-size:12px;color:var(--text-sub);">${sec.count}個</div>
+      </div>
+      <div class="locker-grid">`;
+    for (let n = 1; n <= sec.count; n++) {
+      const key = sec.key === 'mens' ? String(n) : sec.key === 'womens' ? 'W'+n : 'T'+n;
+      const recIdx = occupied[key];
+      const isOccupied = recIdx !== undefined;
+      const r = isOccupied ? records[recIdx] : null;
+      const shortName = r ? (r.name.length > 4 ? r.name.slice(0,4)+'…' : r.name) : '';
+      html += `<button class="locker-btn ${isOccupied?'occupied':'free'}"
+        ${isOccupied ? `onclick="openDialog(${recIdx})"` : ''}>
+        <div class="locker-num">${key}</div>
+        ${isOccupied ? `<div class="locker-name">${shortName}</div>` : ''}
+      </button>`;
+    }
+    html += `</div></div>`;
+  });
+
+  document.getElementById('lockerBoard').innerHTML = html;
+}
+
+function openDialog(idx) {
+  const r = records[idx];
+  dialogTargetIdx = idx;
+  document.getElementById('dlgLockerLabel').textContent = 'ロッカー No.' + r.locker;
+  document.getElementById('dlgName').textContent = r.name;
+  const rentals = [];
+  if (r.wear==='あり')     rentals.push('ウェア');
+  if (r.shoes==='あり')    rentals.push('シューズ');
+  if (r.sunglass==='あり') rentals.push('サングラス');
+  const badges = rentals.map(x=>`<span class="badge-item">${x}</span>`).join('');
+  document.getElementById('dlgInfo').innerHTML = `
+    <div class="dialog-row"><span class="dialog-row-label">電話番号</span><span class="dialog-row-val">${r.phone}</span></div>
+    <div class="dialog-row"><span class="dialog-row-label">レンタル品</span><span class="dialog-row-val">${badges||'なし'}</span></div>
+    ${r.wear==='あり'?`<div class="dialog-row"><span class="dialog-row-label">ウェアサイズ</span><span class="dialog-row-val">${
+      r.wearSizeData ? Object.entries(JSON.parse(r.wearSizeData)).map(([t,s])=>t+'：'+s).join(' ／ ')
+      : [r.topsSize && 'トップス：'+r.topsSize, r.bottomsSize && 'ボトムス：'+r.bottomsSize].filter(Boolean).join(' ／ ')
+    }</span></div>`:''}
+    ${r.shoes==='あり'?`<div class="dialog-row"><span class="dialog-row-label">シューズ</span><span class="dialog-row-val">${r.shoeModel} ${r.shoeSize}</span></div>`:''}
+    ${r.sunglass==='あり'?`<div class="dialog-row"><span class="dialog-row-label">サングラスNo.</span><span class="dialog-row-val">${r.sgNum||'—'}</span></div>`:''}
+    ${r.zack==='あり'?`<div class="dialog-row"><span class="dialog-row-label">ザック番号</span><span class="dialog-row-val">${r.zackNum||'—'}</span></div>`:''}
+    <div class="dialog-row"><span class="dialog-row-label">受付時刻</span><span class="dialog-row-val">${r.date} ${r.time}</span></div>`;
+  document.getElementById('dialogOverlay').classList.add('open');
+}
+
+function closeDialog() {
+  document.getElementById('dialogOverlay').classList.remove('open');
+  dialogTargetIdx = null;
+}
+
+async function confirmReturn() {
+  if (dialogTargetIdx === null) return;
+  returnedIds.add(dialogTargetIdx);
+  closeDialog();
+  renderLockerBoard();
+  // GASに保存
+  if (GAS_URL !== 'YOUR_GAS_WEB_APP_URL_HERE') {
+    try { await gasPost('setReturned', [...returnedIds]); } catch(e) { console.error(e); }
+  } else {
+    localStorage.setItem('rentalReturned', JSON.stringify([...returnedIds]));
+  }
+}
+
+(async () => { await loadSettings(); await load(); })()
+</script>
+</body>
+</html>
