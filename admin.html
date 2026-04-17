@@ -247,9 +247,58 @@
   }
   .toggle-switch input:checked + .toggle-slider { background: var(--green); }
   .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+  /* パスワード画面 */
+  .pw-overlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; padding: 24px;
+  }
+  .pw-box {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 40px 32px;
+    width: 100%; max-width: 360px; text-align: center;
+  }
+  .pw-logo { font-size: 15px; font-weight: 700; color: var(--green); margin-bottom: 24px; }
+  .pw-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .pw-desc  { font-size: 14px; color: var(--text-sub); margin-bottom: 24px; }
+  .pw-input {
+    width: 100%; padding: 13px 14px; border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 18px; font-family: inherit;
+    color: var(--text); background: var(--bg); text-align: center;
+    letter-spacing: 0.2em; margin-bottom: 12px; transition: border-color 0.15s;
+  }
+  .pw-input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(29,158,117,0.12); }
+  .pw-input.error { border-color: #E24B4A; box-shadow: 0 0 0 3px rgba(226,75,74,0.12); animation: shake 0.3s ease; }
+  .pw-btn {
+    width: 100%; padding: 13px; border-radius: var(--radius-sm);
+    border: none; background: var(--green); color: #fff;
+    font-size: 15px; font-family: inherit; font-weight: 700; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .pw-btn:hover { background: var(--green-dark); }
+  .pw-error { font-size: 13px; color: #E24B4A; margin-top: 10px; display: none; }
+  .pw-error.show { display: block; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
 </style>
 </head>
 <body>
+
+<div class="pw-overlay" id="pwOverlay">
+  <div class="pw-box">
+    <div class="pw-logo">管理画面 — レンタル受付</div>
+    <div class="pw-title">パスワードを入力</div>
+    <div class="pw-desc">スタッフ専用ページです。</div>
+    <input class="pw-input" id="pwInput" type="password" placeholder="••••" maxlength="20"
+      onkeydown="if(event.key==='Enter')checkPw()">
+    <button class="pw-btn" onclick="checkPw()">ログイン</button>
+    <div class="pw-error" id="pwError">パスワードが違います</div>
+  </div>
+</div>
 
 <header>
   <div class="logo">管理画面 — レンタル受付</div>
@@ -408,7 +457,7 @@
 // =====================================================
 // ★ Google Apps Script の Web アプリ URL をここに貼る ★
 // =====================================================
-const GAS_URL = 'YOUR_GAS_WEB_APP_URL_HERE';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbycs5ZWsjk07pwNY1M60mKbswqQXEXEkkdp5JkmRg266fwDEd4sVZmIIS7sHaTX70g0/exec';
 // =====================================================
 
 async function gasGet(action) {
@@ -790,7 +839,49 @@ async function confirmReturn() {
   }
 }
 
-(async () => { await loadSettings(); await load(); })()
+
+/* ── パスワード保護 ── */
+const PW_HASH = '0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c'; // SHA-256 of '1111'
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function checkPw() {
+  const val = document.getElementById('pwInput').value;
+  const hash = await sha256(val);
+  if (hash === PW_HASH) {
+    sessionStorage.setItem('adminAuth', '1');
+    document.getElementById('pwOverlay').style.display = 'none';
+    init();
+  } else {
+    const input = document.getElementById('pwInput');
+    const err   = document.getElementById('pwError');
+    input.classList.add('error');
+    err.classList.add('show');
+    input.value = '';
+    setTimeout(() => input.classList.remove('error'), 400);
+  }
+}
+
+function init() {
+  loadSettings().then(() => load());
+}
+
+// ページ読み込み時：認証済みならすぐ表示
+if (sessionStorage.getItem('adminAuth') === '1') {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('pwOverlay').style.display = 'none';
+    init();
+  });
+} else {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('pwInput').focus();
+  });
+}
+
+
 </script>
 </body>
 </html>
