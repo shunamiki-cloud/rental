@@ -800,6 +800,25 @@ function renderLockerBoard() {
   document.getElementById('lockerBoard').innerHTML = html;
 }
 
+function formatDateTime(date, time) {
+  try {
+    // Googleスプレッドシートから来る日付オブジェクト・文字列両対応
+    const d = new Date(date);
+    if (!isNaN(d.getTime()) && String(date).includes('T')) {
+      // ISO形式の場合
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      const t = new Date(time);
+      const h = !isNaN(t.getTime()) && String(time).includes('T')
+        ? String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0')
+        : String(time).substring(0,5);
+      return `${y}/${m}/${day} ${h}`;
+    }
+    return `${date} ${String(time).substring(0,5)}`;
+  } catch(e) { return `${date} ${time}`; }
+}
+
 function openDialog(idx) {
   const r = records[idx];
   dialogTargetIdx = idx;
@@ -820,7 +839,7 @@ function openDialog(idx) {
     ${r.shoes==='あり'?`<div class="dialog-row"><span class="dialog-row-label">シューズ</span><span class="dialog-row-val">${r.shoeModel} ${r.shoeSize}</span></div>`:''}
     ${r.sunglass==='あり'?`<div class="dialog-row"><span class="dialog-row-label">サングラスNo.</span><span class="dialog-row-val">${r.sgNum||'—'}</span></div>`:''}
     ${r.zack==='あり'?`<div class="dialog-row"><span class="dialog-row-label">ザック番号</span><span class="dialog-row-val">${r.zackNum||'—'}</span></div>`:''}
-    <div class="dialog-row"><span class="dialog-row-label">受付時刻</span><span class="dialog-row-val">${r.date} ${r.time}</span></div>`;
+    <div class="dialog-row"><span class="dialog-row-label">受付時刻</span><span class="dialog-row-val">${formatDateTime(r.date, r.time)}</span></div>`;
   document.getElementById('dialogOverlay').classList.add('open');
 }
 
