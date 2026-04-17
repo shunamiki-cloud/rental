@@ -382,21 +382,44 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbycs5ZWsjk07pwNY1M60mKb
 
 function gasCall(action, payload) {
   return new Promise((resolve, reject) => {
-    const cbName = 'gasCallback_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+    const cbName = 'cb_' + action + '_' + Date.now();
     const encoded = payload ? encodeURIComponent(JSON.stringify(payload)) : '';
-    const url = `${GAS_URL}?action=${action}&data=${encoded}&callback=${cbName}`;
-    const script = document.createElement('script');
-    window[cbName] = (data) => {
+    const url = GAS_URL + '?action=' + action + '&data=' + encoded + '&callback=' + cbName;
+
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        reject(new Error('タイムアウト'));
+      }
+    }, 10000);
+
+    function cleanup() {
+      clearTimeout(timer);
       delete window[cbName];
-      if (document.head.contains(script)) document.head.removeChild(script);
-      if (data.ok === false) reject(new Error(data.error));
-      else resolve(data.data !== undefined ? data.data : data);
+      const s = document.getElementById(cbName);
+      if (s) s.parentNode.removeChild(s);
+    }
+
+    window[cbName] = function(data) {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        if (data && data.ok === false) reject(new Error(data.error));
+        else resolve(data && data.data !== undefined ? data.data : data);
+      }
     };
+
+    const script = document.createElement('script');
+    script.id  = cbName;
     script.src = url;
-    script.onerror = () => {
-      delete window[cbName];
-      if (document.head.contains(script)) document.head.removeChild(script);
-      reject(new Error('GAS接続失敗'));
+    script.onerror = function() {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        reject(new Error('GAS接続失敗'));
+      }
     };
     document.head.appendChild(script);
   });
