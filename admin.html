@@ -460,23 +460,26 @@
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbycs5ZWsjk07pwNY1M60mKbswqQXEXEkkdp5JkmRg266fwDEd4sVZmIIS7sHaTX70g0/exec';
 // =====================================================
 
-async function gasGet(action) {
-  const res = await fetch(`${GAS_URL}?action=${action}`);
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error);
-  return data.data;
+function gasCall(action, payload) {
+  return new Promise((resolve, reject) => {
+    const cbName = 'gasCallback_' + Date.now();
+    const encoded = payload ? encodeURIComponent(JSON.stringify(payload)) : '';
+    const url = `${GAS_URL}?action=${action}&data=${encoded}&callback=${cbName}`;
+    window[cbName] = (data) => {
+      delete window[cbName];
+      document.head.removeChild(script);
+      if (data.ok === false) reject(new Error(data.error));
+      else resolve(data.data !== undefined ? data.data : data);
+    };
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = () => { delete window[cbName]; reject(new Error('GAS接続失敗')); };
+    document.head.appendChild(script);
+  });
 }
 
-async function gasPost(action, payload) {
-  const res = await fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, data: payload }),
-  });
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error);
-  return data;
-}
+async function gasGet(action) { return gasCall(action, null); }
+async function gasPost(action, payload) { return gasCall(action, payload); }
 
 let records = [];
 let returnedIds = new Set();

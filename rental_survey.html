@@ -378,23 +378,26 @@
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbycs5ZWsjk07pwNY1M60mKbswqQXEXEkkdp5JkmRg266fwDEd4sVZmIIS7sHaTX70g0/exec';
 // =====================================================
 
-async function gasGet(action) {
-  const res = await fetch(`${GAS_URL}?action=${action}`);
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error);
-  return data.data;
+function gasCall(action, payload) {
+  return new Promise((resolve, reject) => {
+    const cbName = 'gasCallback_' + Date.now();
+    const encoded = payload ? encodeURIComponent(JSON.stringify(payload)) : '';
+    const url = `${GAS_URL}?action=${action}&data=${encoded}&callback=${cbName}`;
+    window[cbName] = (data) => {
+      delete window[cbName];
+      document.head.removeChild(script);
+      if (data.ok === false) reject(new Error(data.error));
+      else resolve(data.data !== undefined ? data.data : data);
+    };
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = () => { delete window[cbName]; reject(new Error('GAS接続失敗')); };
+    document.head.appendChild(script);
+  });
 }
 
-async function gasPost(action, payload) {
-  const res = await fetch(GAS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, data: payload }),
-  });
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error);
-  return data;
-}
+async function gasGet(action) { return gasCall(action, null); }
+async function gasPost(action, payload) { return gasCall(action, payload); }
 
 /* ── 設定をlocalStorageから読み込み ── */
 const DEFAULT_SETTINGS = {
@@ -814,12 +817,24 @@ function resetForm() {
 }
 
 
+async function loadCfgFromGAS() {
+  if (GAS_URL === 'YOUR_GAS_WEB_APP_URL_HERE') return;
+  try {
+    const res  = await fetch(`${GAS_URL}?action=settings`);
+    const data = await res.json();
+    if (data.ok && data.data) {
+      _cfg = mergeCfg(data.data);
+      localStorage.setItem('rentalSettings', JSON.stringify(_cfg));
+    }
+  } catch(e) { console.warn('設定読み込み失敗:', e); }
+}
+
 goStep(0);
 renderRental();
-// バックグラウンドで設定をGASから取得
+// バックグラウンドで設定をGASから取得して再描画
 loadCfgFromGAS().then(() => {
-  _cfg = null; // キャッシュリセットして再読み込み
-  renderRental(); // 品目を再描画
+  _cfg = null;
+  renderRental();
 });
 </script>
 </body>
