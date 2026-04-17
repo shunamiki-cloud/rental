@@ -763,7 +763,7 @@ let dialogTargetIdx = null;
 function getOccupiedMap() {
   const map = {};
   records.forEach((r, idx) => {
-    if (!returnedIds.has(idx) && r.locker) map[r.locker.trim()] = idx;
+    if (!returnedIds.has(idx) && r.locker) map[String(r.locker).trim()] = idx;
   });
   return map;
 }
